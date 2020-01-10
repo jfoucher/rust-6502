@@ -1,0 +1,7 @@
+[package]
+name = "Rust-test"
+version = "0.1.0"
+authors = ["Jonathan Foucher <jfoucher@6px.eu>"]
+edition = "2018"
+
+[dependencies]
