@@ -31,6 +31,9 @@ pub struct Processor {
 #[derive(Debug)]
 pub struct Computer {
     processor: Processor,
+    paused: bool,
+    step: bool,
+    speed: u64,
     data: Vec<u8>,
     tx: mpsc::Sender<ControllerMessage>,
     rx: mpsc::Receiver<ControllerMessage>,
@@ -42,6 +45,9 @@ impl Computer {
             data,
             tx,
             rx,
+            paused: true,
+            step: false,
+            speed: 1000,
             processor: Processor {
                 flags: 0,
                 acc: 0,
@@ -59,12 +65,20 @@ impl Computer {
     }
 
     pub fn step(&mut self) -> bool {
-        let changed = self.run_instruction();
-
         while let Some(message) = self.rx.try_iter().next() {
-                // Handle messages arriving from the UI.
+            // Handle messages arriving from the controller.
             match message {
-                ControllerMessage::ButtonPressed(btn) => {},
+                ControllerMessage::ButtonPressed(btn) => {
+                    if btn == "faster" && self.speed >= 2 {
+                        self.speed /= 2;
+                    } else if btn == "slower" && self.speed <= 10000 {
+                        self.speed *= 2;
+                    } else if btn == "pause" {
+                        self.paused = !self.paused;
+                    } else if btn == "step" {
+                        self.step = true;
+                    }
+                },
                 ControllerMessage::UpdatedProcessorAvailable(processor) => {},
                 ControllerMessage::UpdatedDataAvailable(data) => {},
                 ControllerMessage::GetData() => {
@@ -89,7 +103,17 @@ impl Computer {
                 },
             };
         }
-        
+
+        if self.paused && !self.step {
+            return true;
+        }
+
+        if (self.paused && self.step) || !self.paused {
+            self.step = false;
+            let changed = self.run_instruction();
+
+            thread::sleep(time::Duration::from_millis(self.speed));
+        }
 
         true
     }
@@ -198,7 +222,7 @@ impl Computer {
         let val = self.data[(self.processor.pc + 1) as usize];
         acc += val;
         self.processor.flags = Self::set_flags(self.processor.flags, acc);
-        self.add_info(format!("Running instruction adc: {:#x}", self.data[(self.processor.pc) as usize]));
+        self.add_info(format!("Running instruction adc: {:#x} with acc: {:#x} memval: {:#x}", self.data[(self.processor.pc) as usize], self.processor.acc, val));
         self.processor.acc = acc;
         self.processor.clock += 2;
         self.processor.pc += 2;
@@ -247,9 +271,9 @@ impl Computer {
     }
 
     fn eor(&mut self) {
-        self.add_info(format!("Running instruction eor: {:#x}", self.data[(self.processor.pc) as usize]));
         let val = self.data[(self.processor.pc + 1) as usize];
         let mut acc = self.processor.acc;
+        self.add_info(format!("Running instruction eor: {:#x} with acc: {:#x} memval: {:#x}", self.data[(self.processor.pc) as usize], acc, val));
         //// println!("EOR {:x?} {:x?}", val, acc);
         
         acc ^= val;
@@ -258,8 +282,8 @@ impl Computer {
     }
 
     fn ldx(&mut self) {
-        self.add_info(format!("Running instruction ldx: {:#x}", self.data[(self.processor.pc) as usize]));
         let x = self.data[(self.processor.pc + 1) as usize];
+        self.add_info(format!("Running instruction ldx: {:#x} with val: {:#x}", self.data[(self.processor.pc) as usize], x));
         self.processor.rx = x;
         self.processor.flags = Self::set_flags(self.processor.flags, self.processor.rx);
         self.processor.pc += 2;

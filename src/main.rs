@@ -211,15 +211,7 @@ impl Controller {
                 // Handle messages arriving from the UI.
                 match message {
                     ControllerMessage::ButtonPressed(btn) => {
-                        if btn == "faster" && speed >= 2 {
-                            speed /= 2;
-                        } else if btn == "slower" && speed <= 1000 {
-                            speed *= 2;
-                        } else if btn == "pause" && speed <= 1000 {
-                            paused = !paused;
-                        } else if btn == "step" && speed <= 1000 {
-                            step = true;
-                        }
+                        self.ctx.send(ControllerMessage::ButtonPressed(btn));
                     },
                     ControllerMessage::UpdatedProcessorAvailable(processor) => {
                         self.ui
