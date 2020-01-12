@@ -70,10 +70,10 @@ impl Computer {
             match message {
                 ControllerMessage::ButtonPressed(btn) => {
                     if btn == "faster" && self.speed > 0 {
-                        if (self.speed >= 2) {
+                        if (self.speed >= 4) {
                             self.speed /= 2;
-                        } else {
-                            self.speed -= 2;
+                        } else if self.speed >= 1 {
+                            self.speed -= 1;
                         }
                     } else if btn == "slower" && self.speed <= 10000 {
                         if (self.speed >= 2) {
