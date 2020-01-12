@@ -159,6 +159,10 @@ impl Computer {
         let inst = self.data[(self.processor.pc) as usize];
 
         match inst {
+            0x00 => {
+                /// Push Processor Status
+                self.brk();
+            },
             0x08 => {
                 /// Push Processor Status
                 self.php();
@@ -331,6 +335,8 @@ impl Computer {
         }
     }
 
+
+
     fn adc(&mut self) {
         let mut acc = self.processor.acc;
         let val = self.data[(self.processor.pc + 1) as usize];
@@ -412,7 +418,24 @@ impl Computer {
         self.add_info(format!("{:#x} - Running instruction jsr to: {:#x}", self.processor.pc, addr));
         self.processor.sp -= 2;
         self.processor.pc = addr;
-        self.paused = true;
+    }
+
+    fn brk(&mut self) {
+        let sp: u16 = (self.processor.sp as u16 + 0x100 as u16).into();
+        let mut _addr = self.data.to_vec();
+        let this_pc = self.processor.pc + 2;
+        _addr[sp as usize] = ((this_pc>>8) & 0xff) as u8;
+        _addr[(sp - 1) as usize] = (this_pc & 0xff) as u8;
+        _addr[(sp - 2) as usize] = self.processor.sp;
+
+        self.processor.sp -= 3;
+        self.data = _addr;
+
+        let low_byte = self.data[0xfffe as usize];
+        let high_byte = self.data[0xffff as usize];
+        let new_addr: u16 = low_byte as u16 | ((high_byte as u16) << 8) as u16;
+        self.add_info(format!("{:#x} - Running instruction brk to: {:#x}", self.processor.pc, new_addr));
+        self.processor.pc = new_addr;
     }
 
     fn rts(&mut self) {
@@ -425,7 +448,6 @@ impl Computer {
         self.add_info(format!("{:#x} - Running instruction rts to: {:#x}", self.processor.pc, addr));
         self.processor.sp += 2;
         self.processor.pc = addr + 1;
-        self.paused = true;
     }
 
     /// Clear carry flag
