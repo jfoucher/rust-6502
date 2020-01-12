@@ -9,6 +9,7 @@ use cursive::views::*;
 use std::sync::mpsc;
 
 mod computer;
+mod utils;
 
 use computer::{Processor, Computer, ControllerMessage};
 
@@ -44,41 +45,7 @@ impl Ui {
         let controller_tx_clone3 = ui.controller_tx.clone();
         ui.cursive.add_layer(
             Dialog::around(
-                LinearLayout::horizontal()
-                .child(Dialog::around(
-                    TextView::new("TEST MEM").with_id("memory")
-                ).title("Memory"))
-                .child(
-                    LinearLayout::vertical()
-                    .child(Dialog::around(
-                        LinearLayout::horizontal()
-                        .child(
-                            LinearLayout::vertical()
-                            .child(
-                                TextView::new("Flags")
-                            )
-                            .child(
-                                TextView::new("").with_id("flags")
-                            )
-                        )
-                        .child(
-                            DummyView.fixed_width(1)
-                        )
-                        .child(
-                            LinearLayout::vertical()
-                            .child(
-                                TextView::new("PC")
-                            )
-                            .child(
-                                TextView::new("").with_id("pc")
-                            )
-                        )
-                        
-                    ).title("Processor info"))
-                    .child(Dialog::around(
-                        TextView::new("PROC INFO").with_id("info")
-                    ).title("Debug info").scrollable())
-                )
+                utils::layout()
             )
             
             .button("Faster", move |s| {
@@ -141,6 +108,26 @@ impl Ui {
                         .find_id::<TextView>("pc")
                         .unwrap();
                     output.set_content(format!("{} ({:#x})", processor.pc, processor.pc));
+                    let mut output = self.cursive
+                        .find_id::<TextView>("acc")
+                        .unwrap();
+                    output.set_content(format!("{}", processor.acc));
+                    let mut output = self.cursive
+                        .find_id::<TextView>("rx")
+                        .unwrap();
+                    output.set_content(format!("{}", processor.rx));
+                    let mut output = self.cursive
+                        .find_id::<TextView>("ry")
+                        .unwrap();
+                    output.set_content(format!("{}", processor.ry));
+                    let mut output = self.cursive
+                        .find_id::<TextView>("sp")
+                        .unwrap();
+                    output.set_content(format!("{}", processor.sp));
+                    let mut output = self.cursive
+                        .find_id::<TextView>("clock")
+                        .unwrap();
+                    output.set_content(format!("{}", processor.clock));
 
                     let mut info = self.cursive
                         .find_id::<TextView>("info")
@@ -149,15 +136,29 @@ impl Ui {
                     
                     let mut v = processor.info;
                     
-                    v.reverse();
-                    //println!("{:?}", fmt);
-                    info.set_content(v.join("\n"));
+                    v.reverse();                    
+                    
+                    let r: Vec<String> = v.iter().map(|l| {
+                        let qty = l.qty.clone();
+                        if qty <= 1 {
+                            return l.msg.clone();
+                        }
+                        format!("{} ({})", l.msg.clone(), l.qty.clone())
+                    }).collect();
+                    
+                    info.set_content(r.join("\n"));
+
+                    let mut output = self.cursive
+                        .find_id::<TextView>("test")
+                        .unwrap();
+                    output.set_content(format!("{}", processor.test));
                 },
                 UiMessage::UpdateData(data) => {
                     let mut output = self.cursive
                         .find_id::<TextView>("memory")
                         .unwrap();
                     output.set_content(format!("{:x?}", data));
+                    
                 },
             }
         }
