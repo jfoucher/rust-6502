@@ -51,7 +51,29 @@ impl Ui {
                 .child(
                     LinearLayout::vertical()
                     .child(Dialog::around(
-                        TextView::new("PROC DATA").with_id("processor")
+                        LinearLayout::horizontal()
+                        .child(
+                            LinearLayout::vertical()
+                            .child(
+                                TextView::new("Flags")
+                            )
+                            .child(
+                                TextView::new("").with_id("flags")
+                            )
+                        )
+                        .child(
+                            DummyView.fixed_width(1)
+                        )
+                        .child(
+                            LinearLayout::vertical()
+                            .child(
+                                TextView::new("PC")
+                            )
+                            .child(
+                                TextView::new("").with_id("pc")
+                            )
+                        )
+                        
                     ).title("Processor info"))
                     .child(Dialog::around(
                         TextView::new("PROC INFO").with_id("info")
@@ -92,7 +114,7 @@ impl Ui {
         );
 
         // Configure a callback
-        
+        ui.cursive.refresh();
         
         ui
     }
@@ -104,21 +126,32 @@ impl Ui {
             return false;
         }
 
+        let mut prev_info: String;
         // Process any pending UI messages
         while let Some(message) = self.ui_rx.try_iter().next() {
             match message {
                 UiMessage::UpdateProcessor(processor) => {
                     //println!("UpdateProcessor {}", processor.clock);
                     let mut output = self.cursive
-                        .find_id::<TextView>("processor")
+                        .find_id::<TextView>("flags")
                         .unwrap();
-                    output.set_content(format!("{:?}", processor));
+                    output.set_content(format!("{:b}", processor.flags));
+
+                    let mut output = self.cursive
+                        .find_id::<TextView>("pc")
+                        .unwrap();
+                    output.set_content(format!("{} ({:#x})", processor.pc, processor.pc));
 
                     let mut info = self.cursive
                         .find_id::<TextView>("info")
                         .unwrap();
-                    let fmt = format!("{}\n{}", processor.info, info.get_content().source());
-                    info.set_content(fmt);
+                    
+                    
+                    let mut v = processor.info;
+                    
+                    v.reverse();
+                    //println!("{:?}", fmt);
+                    info.set_content(v.join("\n"));
                 },
                 UiMessage::UpdateData(data) => {
                     let mut output = self.cursive
@@ -156,7 +189,7 @@ impl Controller {
     }
     /// Run the controller
     pub fn run(&mut self) {
-        let mut speed = 24;
+        let mut speed = 2;
         let mut i = 1;
         let mut paused: bool = true;
         let mut step: bool = false;

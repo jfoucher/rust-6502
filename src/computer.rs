@@ -17,7 +17,7 @@ pub struct Processor {
     pub ry: u8,
     pub pc: u16,
     pub sp: u8,
-    pub info: String,
+    pub info: Vec<String>,
     pub clock: u64,
 }
 
@@ -41,7 +41,7 @@ impl Computer {
                 /// Start at 0x400
                 pc: 0x400,
                 sp: 0,
-                info: "".to_string(),
+                info: vec![],
                 clock: 0,
             }
         };
@@ -51,19 +51,21 @@ impl Computer {
     pub fn step(&mut self) -> bool {
         let local_tx = self.tx.clone();
         
-        self.run_instruction();
+        let changed = self.run_instruction();
 
+        let l = self.processor.info.len();
+        if l > 20 {
+            self.processor.info = self.processor.info[l-20..].to_vec();
+        }
         //println!("{:?}", self.processor);
 
-        let local_proc = self.processor.clone();
-        let local_data = self.data.clone();
         local_tx.send(
-            ControllerMessage::UpdatedProcessorAvailable(local_proc.clone())
+            ControllerMessage::UpdatedProcessorAvailable(self.processor.clone())
         );
         //only send a slice of the data
-        let btm :u16 = if local_proc.pc > 256 { (local_proc.pc - 255) }else {0};
-        let top :u16 = if (local_proc.pc < 0xffff - 256) { local_proc.pc + 256} else { 0xffff };
-        let mem_to_display = local_data[btm as usize ..=top as usize].to_vec();
+        let btm :u16 = if self.processor.pc > 256 { (self.processor.pc - 255) }else {0};
+        let top :u16 = if (self.processor.pc < 0xffff - 256) { self.processor.pc + 256} else { 0xffff };
+        let mem_to_display = self.data[btm as usize ..=top as usize].to_vec();
 
         local_tx.send(
             ControllerMessage::UpdatedDataAvailable(mem_to_display)
@@ -161,15 +163,15 @@ impl Computer {
         let mut acc = self.processor.acc;
         let val = self.data[(self.processor.pc + 1) as usize];
         acc += val;
-        self.processor.flags = Self::set_flags(self.processor.flags.clone(), acc);
-        self.processor.info = format!("Running instruction adc: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.flags = Self::set_flags(self.processor.flags, acc);
+        self.processor.info.push(format!("Running instruction adc: {:#x}", self.data[(self.processor.pc) as usize]));
         self.processor.acc = acc;
         self.processor.clock += 2;
         self.processor.pc += 2;
     }
 
     fn cld(&mut self) {
-        self.processor.info = format!("Running instruction cld: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction cld: {:#x}", self.data[(self.processor.pc) as usize]));
         self.processor.pc += 1;
         self.processor.flags = self.processor.flags & 0x7;
         self.processor.clock += 2;
@@ -181,7 +183,7 @@ impl Computer {
         self.processor.clock += 2;
         self.processor.sp = self.processor.rx;
         self.processor.flags = Self::set_flags( self.processor.flags, self.processor.sp);
-        self.processor.info = format!("Running instruction txs: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction txs: {:#x}", self.data[(self.processor.pc) as usize]));
     }
 
     fn tya(&mut self) {
@@ -189,12 +191,12 @@ impl Computer {
         self.processor.clock += 2;
         self.processor.acc = self.processor.ry;
         self.processor.flags = Self::set_flags(self.processor.flags, self.processor.acc);
-        self.processor.info = format!("Running instruction tya: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction tya: {:#x}", self.data[(self.processor.pc) as usize]));
     }
 
     fn clc(&mut self) {
         self.processor.flags =  self.processor.flags & 0xFE;
-        self.processor.info = format!("Running instruction clc: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction clc: {:#x}", self.data[(self.processor.pc) as usize]));
         self.processor.pc += 1;
         self.processor.clock += 1;
     }
@@ -205,14 +207,14 @@ impl Computer {
         self.processor.clock += 1;
         self.processor.rx = self.processor.acc;
         self.processor.flags = Self::set_flags(self.processor.flags, self.processor.rx);
-        self.processor.info = format!("Running instruction tax: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction tax: {:#x}", self.data[(self.processor.pc) as usize]));
     }
 
     fn eor(&mut self) {
         let val = self.data[(self.processor.pc + 1) as usize];
         let mut acc = self.processor.acc;
         //// println!("EOR {:x?} {:x?}", val, acc);
-        self.processor.info = format!("Running instruction eor: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction eor: {:#x}", self.data[(self.processor.pc) as usize]));
         acc ^= val;
         self.processor.pc += 2;
         self.processor.acc = acc;
@@ -223,7 +225,7 @@ impl Computer {
         self.processor.rx = x;
         self.processor.flags = Self::set_flags(self.processor.flags, self.processor.rx);
         self.processor.pc += 2;
-        self.processor.info = format!("Running instruction ldx: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction ldx: {:#x}", self.data[(self.processor.pc) as usize]));
     }
 
     fn ldy(&mut self) {
@@ -232,7 +234,7 @@ impl Computer {
         self.processor.flags = Self::set_flags(self.processor.flags, self.processor.ry);
         self.processor.pc += 2;
         self.processor.clock += 4;
-        self.processor.info = format!("Running instruction ldy: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction ldy: {:#x}", self.data[(self.processor.pc) as usize]));
     }
 
     fn lda(&mut self) {
@@ -258,7 +260,7 @@ impl Computer {
     fn dex(&mut self) {
         self.processor.rx = self.processor.rx.wrapping_sub(1);
         self.processor.flags = Self::set_flags(self.processor.flags, self.processor.rx);
-        self.processor.info = format!("Running instruction dex: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction dex: {:#x}", self.data[(self.processor.pc) as usize]));
         self.processor.pc += 1;
         self.processor.clock += 2;
     }
@@ -266,7 +268,7 @@ impl Computer {
     fn dey(&mut self) {
         self.processor.ry = self.processor.ry.wrapping_sub(1);
         self.processor.flags = Self::set_flags(self.processor.flags,  self.processor.ry);
-        self.processor.info = format!("Running instruction dey: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction dey: {:#x}", self.data[(self.processor.pc) as usize]));
         self.processor.pc += 1;
         self.processor.clock += 2;
     }
@@ -283,17 +285,17 @@ impl Computer {
         self.processor.flags = flags;
         self.processor.pc += 2;
         self.processor.clock += 4;
-        self.processor.info = format!("Running instruction cmp: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction cmp: {:#x}", self.data[(self.processor.pc) as usize]));
     }
 
     fn sta(&mut self) {
         let addr = Self::get_word(&self.data, self.processor.pc + 1);
     // // println!("sta addr 0x{:x?}", addr);
-        let mut _addr = self.data.to_vec().clone();
+        let mut _addr = self.data.to_vec();
         _addr[addr as usize] = self.processor.acc;
         self.data = _addr;
 
-        self.processor.info = format!("Running instruction sta: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction sta: {:#x}", self.data[(self.processor.pc) as usize]));
         self.processor.pc += 3;
         self.processor.clock += 5;
     }
@@ -302,7 +304,7 @@ impl Computer {
         let addr = Self::get_word(&self.data, self.processor.pc + 1);
         //// println!("Jumping to 0x{:x?}", addr);
         self.processor.pc = addr;
-        self.processor.info = format!("Running instruction jmp: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction jmp: {:#x}", self.data[(self.processor.pc) as usize]));
     }
 
     fn bne(&mut self) {
@@ -322,6 +324,7 @@ impl Computer {
 
         self.processor.clock += 3;
         self.processor.pc = new_addr;
+        self.processor.info.push(info);
     }
 
 
@@ -340,6 +343,7 @@ impl Computer {
         }
         self.processor.clock += 3;
         self.processor.pc = new_addr;
+        self.processor.info.push(info);
     }
 
     fn bpl(&mut self) {
@@ -357,12 +361,13 @@ impl Computer {
         }
         self.processor.pc = new_addr;
         self.processor.clock += 3;
+        self.processor.info.push(info);
     }
 
     fn nop(&mut self) {
         self.processor.pc += 1;
         self.processor.clock += 2;
-        self.processor.info = format!("Running instruction nop: {:#x}", self.data[(self.processor.pc) as usize]);
+        self.processor.info.push(format!("Running instruction nop: {:#x}", self.data[(self.processor.pc) as usize]));
     }
 
     pub fn set_flags(flags:u8, val:u8) -> u8 {
