@@ -7,6 +7,7 @@ use cursive::event::Key;
 use cursive::view::*;
 use cursive::views::*;
 use std::sync::mpsc;
+use std::thread;
 
 mod computer;
 mod utils;
@@ -173,8 +174,8 @@ impl Ui {
 
 pub struct Controller {
     rx: mpsc::Receiver<ControllerMessage>,
+    ctx: mpsc::Sender<ControllerMessage>,
     ui: Ui,
-    computer: Computer,
 }
 
 impl Controller {
@@ -182,10 +183,20 @@ impl Controller {
     pub fn new(filename: String) -> Result<Controller, String> {
         let data = fs::read(filename).expect("could not read file");
         let (tx, rx) = mpsc::channel::<ControllerMessage>();
+        let controller_tx = tx.clone();
+        let (computer_tx, computer_rx) = mpsc::channel::<ControllerMessage>();
+        let child = thread::spawn(move || {
+            let mut computer = Computer::new(controller_tx, computer_rx, data);
+            loop {
+                computer.step();
+            }
+        });
+        
+
         Ok(Controller {
             rx: rx,
+            ctx: computer_tx.clone(),
             ui: Ui::new(tx.clone()),
-            computer: Computer::new(tx.clone(), data),
         })
     }
     /// Run the controller
@@ -195,13 +206,7 @@ impl Controller {
         let mut paused: bool = true;
         let mut step: bool = false;
         while self.ui.step() {
-            if (i % speed == 0 && !paused) || (paused && step) {
-                self.computer.step();
-                step = false;
-            }
-
-            i += 1;
-            
+            self.ctx.send(ControllerMessage::GetData());
             while let Some(message) = self.rx.try_iter().next() {
                 // Handle messages arriving from the UI.
                 match message {
@@ -229,6 +234,8 @@ impl Controller {
                             .send(UiMessage::UpdateData(data))
                             .unwrap();
                     },
+
+                    ControllerMessage::GetData() => {},
                 };
             }
         }
