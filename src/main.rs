@@ -8,6 +8,10 @@ use cursive::view::*;
 use cursive::views::*;
 use std::sync::mpsc;
 
+mod computer;
+
+use computer::{Processor, Computer, ControllerMessage};
+
 pub struct Ui {
     cursive: Cursive,
     ui_rx: mpsc::Receiver<UiMessage>,
@@ -35,25 +39,53 @@ impl Ui {
         // Create a view tree with a TextArea for input, and a
         // TextView for output.
         let controller_tx_clone = ui.controller_tx.clone();
+        let controller_tx_clone1 = ui.controller_tx.clone();
+        let controller_tx_clone2 = ui.controller_tx.clone();
+        let controller_tx_clone3 = ui.controller_tx.clone();
         ui.cursive.add_layer(
             Dialog::around(
                 LinearLayout::horizontal()
                 .child(Dialog::around(
                     TextView::new("TEST MEM").with_id("memory")
-                ))
-                .child(Dialog::around(
-                    TextView::new("PROC DATA").with_id("processor")
-                ))
+                ).title("Memory"))
+                .child(
+                    LinearLayout::vertical()
+                    .child(Dialog::around(
+                        TextView::new("PROC DATA").with_id("processor")
+                    ).title("Processor info"))
+                    .child(Dialog::around(
+                        TextView::new("PROC INFO").with_id("info")
+                    ).title("Debug info").scrollable())
+                )
             )
-            .button("Quit", |s| {
-                std::process::abort();
-                std::process::exit(0);
-            })
+            
             .button("Faster", move |s| {
                 controller_tx_clone.send(
                     ControllerMessage::ButtonPressed("faster".to_string())
                 )
                 .unwrap();
+            })
+            .button("Slower", move |s| {
+                controller_tx_clone1.send(
+                    ControllerMessage::ButtonPressed("slower".to_string())
+                )
+                .unwrap();
+            })
+            .button("Pause", move |s| {
+                controller_tx_clone2.send(
+                    ControllerMessage::ButtonPressed("pause".to_string())
+                )
+                .unwrap();
+            })
+            .button("Step", move |s| {
+                controller_tx_clone3.send(
+                    ControllerMessage::ButtonPressed("step".to_string())
+                )
+                .unwrap();
+            })
+            .button("Quit", |s| {
+                std::process::abort();
+                std::process::exit(0);
             })
             .title("6502 simulator")
             .full_screen()
@@ -76,16 +108,23 @@ impl Ui {
         while let Some(message) = self.ui_rx.try_iter().next() {
             match message {
                 UiMessage::UpdateProcessor(processor) => {
+                    //println!("UpdateProcessor {}", processor.clock);
                     let mut output = self.cursive
                         .find_id::<TextView>("processor")
                         .unwrap();
                     output.set_content(format!("{:?}", processor));
+
+                    let mut info = self.cursive
+                        .find_id::<TextView>("info")
+                        .unwrap();
+                    let fmt = format!("{}\n{}", processor.info, info.get_content().source());
+                    info.set_content(fmt);
                 },
                 UiMessage::UpdateData(data) => {
                     let mut output = self.cursive
                         .find_id::<TextView>("memory")
                         .unwrap();
-                    output.set_content(format!("{:?}", data));
+                    output.set_content(format!("{:x?}", data));
                 },
             }
         }
@@ -97,67 +136,11 @@ impl Ui {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Processor {
-    flags: u8,
-    acc: u8,
-    rx: u8,
-    ry: u8,
-    pc: u16,
-    sp: u8,
-    info: String,
-    clock: u64,
-    speed: u64,
-}
-
-#[derive(Clone, Debug)]
-pub struct Computer {
-    data: Vec<u8>,
-    processor: Processor,
-    tx: mpsc::Sender<ControllerMessage>
-}
-
-impl Computer {
-    pub fn new(tx: mpsc::Sender<ControllerMessage>, data: Vec<u8>) -> Computer {
-        let mut computer = Computer {
-            data,
-            tx,
-            processor: Processor {
-                flags: 0,
-                acc: 0,
-                rx: 0,
-                ry: 0,
-                pc: 0,
-                sp: 0,
-                info: "".to_string(),
-                clock: 0,
-                speed: 0,
-            }
-        };
-        computer
-    }
-
-    pub fn step(&mut self) -> bool {
-        // Process any pending UI messages
-        self.processor.clock += 1;
-        self.tx.send(
-            ControllerMessage::UpdatedProcessorAvailable(self.processor.to_owned())
-        );
-
-        true
-    }
-}
 
 pub struct Controller {
     rx: mpsc::Receiver<ControllerMessage>,
     ui: Ui,
     computer: Computer,
-}
-
-pub enum ControllerMessage {
-    ButtonPressed(String),
-    UpdatedProcessorAvailable(Processor),
-    UpdatedDataAvailable(Vec<u8>),
 }
 
 impl Controller {
@@ -173,23 +156,44 @@ impl Controller {
     }
     /// Run the controller
     pub fn run(&mut self) {
+        let mut speed = 24;
+        let mut i = 1;
+        let mut paused: bool = true;
+        let mut step: bool = false;
         while self.ui.step() {
-            self.computer.step();
+            if (i % speed == 0 && !paused) || (paused && step) {
+                self.computer.step();
+                step = false;
+            }
+
+            i += 1;
+            
             while let Some(message) = self.rx.try_iter().next() {
                 // Handle messages arriving from the UI.
                 match message {
                     ControllerMessage::ButtonPressed(btn) => {
-                        println!("button pressed {}", btn)
+                        if btn == "faster" && speed >= 2 {
+                            speed /= 2;
+                        } else if btn == "slower" && speed <= 1000 {
+                            speed *= 2;
+                        } else if btn == "pause" && speed <= 1000 {
+                            paused = !paused;
+                        } else if btn == "step" && speed <= 1000 {
+                            step = true;
+                        }
                     },
                     ControllerMessage::UpdatedProcessorAvailable(processor) => {
-                        //println!("processor updated");
                         self.ui
                             .ui_tx
                             .send(UiMessage::UpdateProcessor(processor))
                             .unwrap();
+                        //self.computer.step();
                     },
                     ControllerMessage::UpdatedDataAvailable(data) => {
-                        println!("data");
+                        self.ui
+                            .ui_tx
+                            .send(UiMessage::UpdateData(data))
+                            .unwrap();
                     },
                 };
             }
