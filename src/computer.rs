@@ -47,7 +47,7 @@ impl Computer {
             rx,
             paused: true,
             step: false,
-            speed: 1000,
+            speed: 0,
             processor: Processor {
                 flags: 0,
                 acc: 0,
@@ -69,10 +69,18 @@ impl Computer {
             // Handle messages arriving from the controller.
             match message {
                 ControllerMessage::ButtonPressed(btn) => {
-                    if btn == "faster" && self.speed >= 2 {
+                    if btn == "faster" && self.speed > 0 {
+                        if (self.speed >= 2) {
                         self.speed /= 2;
+                        } else {
+                            self.speed -= 2;
+                        }
                     } else if btn == "slower" && self.speed <= 10000 {
+                        if (self.speed >= 2) {
                         self.speed *= 2;
+                        } else {
+                            self.speed += 2;
+                        }
                     } else if btn == "pause" {
                         self.paused = !self.paused;
                     } else if btn == "step" {
@@ -111,8 +119,10 @@ impl Computer {
         if (self.paused && self.step) || !self.paused {
             self.step = false;
             let changed = self.run_instruction();
-
+            if (self.speed > 0) {
             thread::sleep(time::Duration::from_millis(self.speed));
+        }
+
         }
 
         true
