@@ -12,7 +12,7 @@ use std::thread;
 mod computer;
 mod utils;
 
-use computer::{Processor, Computer, ControllerMessage};
+use computer::{Processor, Computer, ControllerMessage, ComputerMessage};
 
 pub struct Ui {
     cursive: Cursive,
@@ -24,6 +24,7 @@ pub struct Ui {
 pub enum UiMessage {
     UpdateProcessor(Processor),
     UpdateData(Vec<u8>),
+    UpdateStack(Vec<u8>),
 }
 
 impl Ui {
@@ -44,6 +45,7 @@ impl Ui {
         let controller_tx_clone1 = ui.controller_tx.clone();
         let controller_tx_clone2 = ui.controller_tx.clone();
         let controller_tx_clone3 = ui.controller_tx.clone();
+
         ui.cursive.add_layer(
             Dialog::around(
                 utils::layout()
@@ -159,7 +161,12 @@ impl Ui {
                         .find_id::<TextView>("memory")
                         .unwrap();
                     output.set_content(format!("{:x?}", data));
-                    
+                },
+                UiMessage::UpdateStack(data) => {
+                    let mut output = self.cursive
+                        .find_id::<TextView>("stack")
+                        .unwrap();
+                    output.set_content(format!("{:x?}", data));
                 },
             }
         }
@@ -174,7 +181,7 @@ impl Ui {
 
 pub struct Controller {
     rx: mpsc::Receiver<ControllerMessage>,
-    ctx: mpsc::Sender<ControllerMessage>,
+    ctx: mpsc::Sender<ComputerMessage>,
     ui: Ui,
 }
 
@@ -184,7 +191,7 @@ impl Controller {
         let data = fs::read(filename).expect("could not read file");
         let (tx, rx) = mpsc::channel::<ControllerMessage>();
         let controller_tx = tx.clone();
-        let (computer_tx, computer_rx) = mpsc::channel::<ControllerMessage>();
+        let (computer_tx, computer_rx) = mpsc::channel::<ComputerMessage>();
         let child = thread::spawn(move || {
             let mut computer = Computer::new(controller_tx, computer_rx, data);
             loop {
@@ -206,12 +213,12 @@ impl Controller {
         let mut paused: bool = true;
         let mut step: bool = false;
         while self.ui.step() {
-            self.ctx.send(ControllerMessage::GetData());
+            self.ctx.send(ComputerMessage::GetData());
             while let Some(message) = self.rx.try_iter().next() {
                 // Handle messages arriving from the UI.
                 match message {
                     ControllerMessage::ButtonPressed(btn) => {
-                        self.ctx.send(ControllerMessage::ButtonPressed(btn));
+                        self.ctx.send(ComputerMessage::ButtonPressed(btn));
                     },
                     ControllerMessage::UpdatedProcessorAvailable(processor) => {
                         self.ui
@@ -227,7 +234,12 @@ impl Controller {
                             .unwrap();
                     },
 
-                    ControllerMessage::GetData() => {},
+                    ControllerMessage::UpdatedStackAvailable(data) => {
+                        self.ui
+                            .ui_tx
+                            .send(UiMessage::UpdateStack(data))
+                            .unwrap();
+                    },
                 };
             }
         }

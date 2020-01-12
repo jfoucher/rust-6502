@@ -94,13 +94,16 @@ pub fn layout() -> cursive::views::LinearLayout {
                     )
                 )
                 
-            ).title("Processor info").fixed_width(60))
+            ).title("Processor info").fixed_width(80))
             .child(Dialog::around(
                 TextView::new("PROC INFO").with_id("info")
-            ).title("Debug info").fixed_width(60).scrollable())
+            ).title("Debug info").fixed_width(80).scrollable())
             .child(Dialog::around(
                 TextView::new("T").with_id("test")
-            ).title("Current test").fixed_width(60).scrollable())
+            ).title("Current test").fixed_width(80).scrollable())
+            .child(Dialog::around(
+                TextView::new("T").with_id("stack")
+            ).title("Stack").fixed_width(80).scrollable())
             
         )
             
