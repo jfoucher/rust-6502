@@ -8,7 +8,7 @@ This has been a fun project over the week-end, but now on Sunday night it's time
 
 If some experienced Rust developpers happen to glance at this, I'm waiting for your suggestions and critiques in the [Issues tab](https://github.com/jfoucher/rust-6502/issues)
 
-The emulator is BY NO MEANS feature complete and uses the simplest form of emulation (a giant switch case with one branch per instruction). It can currently run the first ten tests of [6502_functional_test.ca65](https://github.com/amb5l/6502_65C02_functional_tests)
+The emulator is BY NO MEANS feature complete and uses the simplest form of emulation (a giant switch case with one branch per instruction). It can currently run the first 30 tests of [6502_functional_test.ca65](https://github.com/amb5l/6502_65C02_functional_tests)
 
 To run the code launch `cargo run 6502_functional_test.bin`
 

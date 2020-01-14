@@ -1,6 +1,7 @@
 extern crate cursive;
 use std::env;
-
+use std::io;
+use std::io::Write;
 use std::fs;
 use cursive::Cursive;
 use cursive::event::Key;
@@ -25,6 +26,7 @@ pub enum UiMessage {
     UpdateProcessor(Processor),
     UpdateData(Vec<u8>),
     UpdateStack(Vec<u8>),
+    UpdateOutput(Vec<u8>),
 }
 
 impl Ui {
@@ -114,23 +116,25 @@ impl Ui {
                     let mut output = self.cursive
                         .find_id::<TextView>("acc")
                         .unwrap();
-                    output.set_content(format!("{}", processor.acc));
+                    output.set_content(format!("{:#x}", processor.acc));
                     let mut output = self.cursive
                         .find_id::<TextView>("rx")
                         .unwrap();
-                    output.set_content(format!("{}", processor.rx));
+                    output.set_content(format!("{:#x}", processor.rx));
                     let mut output = self.cursive
                         .find_id::<TextView>("ry")
                         .unwrap();
-                    output.set_content(format!("{}", processor.ry));
+                    output.set_content(format!("{:#x}", processor.ry));
                     let mut output = self.cursive
                         .find_id::<TextView>("sp")
                         .unwrap();
-                    output.set_content(format!("{}", processor.sp));
+                    output.set_content(format!("{:#x}", processor.sp));
+                    
                     let mut output = self.cursive
                         .find_id::<TextView>("clock")
                         .unwrap();
                     output.set_content(format!("{}", processor.clock));
+                    
 
                     let mut info = self.cursive
                         .find_id::<TextView>("info")
@@ -139,7 +143,7 @@ impl Ui {
                     
                     let mut v = processor.info;
                     
-                    v.reverse();                    
+                    v.reverse();
                     
                     let r: Vec<String> = v.iter().map(|l| {
                         let qty = l.qty.clone();
@@ -154,7 +158,7 @@ impl Ui {
                     let mut output = self.cursive
                         .find_id::<TextView>("test")
                         .unwrap();
-                    output.set_content(format!("{}", processor.test));
+                    output.set_content(format!("{}", processor.test[0]));
                 },
                 UiMessage::UpdateData(data) => {
                     let mut output = self.cursive
@@ -167,6 +171,19 @@ impl Ui {
                         .find_id::<TextView>("stack")
                         .unwrap();
                     output.set_content(format!("{:x?}", data));
+                },
+                UiMessage::UpdateOutput(data) => {
+                    let mut output = self.cursive
+                        .find_id::<TextView>("output")
+                        .unwrap();
+
+                        //println!("{:?}", data);
+                        let stdout = io::stdout();
+                        let mut handle = stdout.lock();
+
+                        handle.write_all(&data);
+
+
                 },
             }
         }
@@ -238,6 +255,12 @@ impl Controller {
                         self.ui
                             .ui_tx
                             .send(UiMessage::UpdateStack(data))
+                            .unwrap();
+                    },
+                    ControllerMessage::UpdatedOutputAvailable(data) => {
+                            self.ui
+                            .ui_tx
+                            .send(UiMessage::UpdateOutput(data))
                             .unwrap();
                     },
                 };

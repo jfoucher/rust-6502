@@ -5,9 +5,19 @@ use cursive::view::*;
 pub fn layout() -> cursive::views::LinearLayout {
 
     LinearLayout::horizontal()
-        .child(Dialog::around(
-            TextView::new("TEST MEM").with_id("memory")
-        ).title("Memory"))
+        .child(
+            LinearLayout::vertical()
+            .child(
+                Dialog::around(
+                    TextView::new("TEST MEM").with_id("memory")
+                ).title("Memory")
+            )
+            .child(
+                Dialog::around(
+                    TextView::new("OUTPUT").with_id("output")
+                ).title("Output")
+            )
+        )
         .child(
             LinearLayout::vertical()
             .child(Dialog::around(
