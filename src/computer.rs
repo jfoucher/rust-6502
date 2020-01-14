@@ -204,9 +204,17 @@ impl Computer {
                 //// println!("Running instruction bpl : {:x?}", inst);
                 self.bpl();
             },
+            0x16 => {
+                /// Push Processor Status
+                self.asl(ADRESSING_MODE::ZERO_PAGE_X);
+            },
             0x18 => {
                 //// println!("Running instruction clc : {:x?}", inst);
                 self.clc();
+            },
+            0x1e => {
+                /// Push Processor Status
+                self.asl(ADRESSING_MODE::ABSOLUTE_X);
             },
             0x20 => {
                 //// println!("Running instruction clc : {:x?}", inst);
@@ -232,13 +240,25 @@ impl Computer {
                 //// println!("Running instruction clc : {:x?}", inst);
                 self.bit(ADRESSING_MODE::ABSOLUTE);
             },
+            0x2e => {
+                //// println!("Running instruction clc : {:x?}", inst);
+                self.rol(ADRESSING_MODE::ABSOLUTE);
+            },
             0x30 => {
                 //// println!("Running instruction clc : {:x?}", inst);
                 self.bmi();
             },
+            0x36 => {
+                //// println!("Running instruction clc : {:x?}", inst);
+                self.rol(ADRESSING_MODE::ZERO_PAGE_X);
+            },
             0x38 => {
                 //// println!("Running instruction clc : {:x?}", inst);
                 self.sec();
+            },
+            0x3e => {
+                //// println!("Running instruction clc : {:x?}", inst);
+                self.rol(ADRESSING_MODE::ABSOLUTE_X);
             },
             0x40 => {
                 //// println!("Running instruction clc : {:x?}", inst);
@@ -264,13 +284,25 @@ impl Computer {
                 //// println!("Running instruction jmp : {:x?}", inst);
                 self.jmp(ADRESSING_MODE::ABSOLUTE);
             },
+            0x4e => {
+                //// println!("Running instruction jmp : {:x?}", inst);
+                self.lsr(ADRESSING_MODE::ABSOLUTE);
+            },
             0x50 => {
                 ///Branch if Overflow Clear
                 self.bvc();
             },
+            0x56 => {
+                /// Push Processor Status
+                self.lsr(ADRESSING_MODE::ZERO_PAGE_X);
+            },
             0x58 => {
                 ///Branch if Overflow Clear
                 self.cli();
+            },
+            0x5e => {
+                /// Push Processor Status
+                self.lsr(ADRESSING_MODE::ABSOLUTE_X);
             },
             0x60 => {
                 ///Branch if Overflow Clear
@@ -296,14 +328,25 @@ impl Computer {
                 /// Jump indirect
                 self.jmp(ADRESSING_MODE::INDIRECT);
             },
-
+            0x6e => {
+                /// Push Processor Status
+                self.ror(ADRESSING_MODE::ABSOLUTE);
+            },
             0x70 => {
                 /// Branch if overflow set
                 self.bvs();
             },
+            0x76 => {
+                /// Push Processor ZE
+                self.ror(ADRESSING_MODE::ZERO_PAGE_X);
+            },
             0x78 => {
                 /// Set interrupt flag
                 self.sei();
+            },
+            0x7e => {
+                /// Push Processor ZE
+                self.ror(ADRESSING_MODE::ABSOLUTE_X);
             },
             0x81 => {
                 //// println!("Running instruction sta : {:x?}", inst);
@@ -487,6 +530,10 @@ impl Computer {
                 //// println!("Running instruction dex : {:x?}", inst);
                 self.cmp(ADRESSING_MODE::ZERO_PAGE);
             },
+            0xc6 => {
+                //// println!("Running instruction bne : {:x?}", inst);
+                self.dec(ADRESSING_MODE::ZERO_PAGE);
+            },
             0xc8 => {
                 //// println!("Running instruction bne : {:x?}", inst);
                 self.iny();
@@ -507,6 +554,10 @@ impl Computer {
                 //// println!("Running instruction dex : {:x?}", inst);
                 self.cmp(ADRESSING_MODE::ABSOLUTE);
             },
+            0xce => {
+                //// println!("Running instruction bne : {:x?}", inst);
+                self.dec(ADRESSING_MODE::ABSOLUTE);
+            },
             0xd0 => {
                 //// println!("Running instruction bne : {:x?}", inst);
                 self.bne();
@@ -518,6 +569,10 @@ impl Computer {
             0xd5 => {
                 //// println!("Running instruction dex : {:x?}", inst);
                 self.cmp(ADRESSING_MODE::ZERO_PAGE_X);
+            },
+            0xd6 => {
+                //// println!("Running instruction bne : {:x?}", inst);
+                self.dec(ADRESSING_MODE::ZERO_PAGE_X);
             },
             0xd8 => {
                 //// println!("Running instruction cld : {:x?}", inst);
@@ -531,6 +586,10 @@ impl Computer {
                 //// println!("Running instruction cmp : {:x?}", inst);
                 self.cmp(ADRESSING_MODE::ABSOLUTE_X);
             },
+            0xde => {
+                //// println!("Running instruction bne : {:x?}", inst);
+                self.dec(ADRESSING_MODE::ABSOLUTE_X);
+            },
             0xe0 => {
                 //// println!("Running instruction bne : {:x?}", inst);
                 self.cpx(ADRESSING_MODE::IMMEDIATE);
@@ -538,6 +597,10 @@ impl Computer {
             0xe4 => {
                 //// println!("Running instruction bne : {:x?}", inst);
                 self.cpx(ADRESSING_MODE::ZERO_PAGE);
+            },
+            0xe6 => {
+                //// println!("Running instruction bne : {:x?}", inst);
+                self.inc(ADRESSING_MODE::ZERO_PAGE);
             },
             0xe8 => {
                 //// println!("Running instruction bne : {:x?}", inst);
@@ -547,13 +610,25 @@ impl Computer {
                 //// println!("Running instruction cmp : {:x?}", inst);
                 self.cpx(ADRESSING_MODE::ABSOLUTE);
             },
+            0xee => {
+                //// println!("Running instruction bne : {:x?}", inst);
+                self.inc(ADRESSING_MODE::ABSOLUTE);
+            },
             0xf0 => {
                 //// println!("Running instruction beq : {:x?}", inst);
                 self.beq();
             },
+            0xf6 => {
+                //// println!("Running instruction bne : {:x?}", inst);
+                self.inc(ADRESSING_MODE::ZERO_PAGE_X);
+            },
             0xf8 => {
                 /// Set decimal flag
                 self.sed();
+            },
+            0xfe => {
+                //// println!("Running instruction bne : {:x?}", inst);
+                self.inc(ADRESSING_MODE::ABSOLUTE_X);
             },
             _ => {
                 //// println!("Running instruction nop : {:x?}", inst);
@@ -584,6 +659,8 @@ impl Computer {
         self.processor.clock += 2;
         self.processor.pc += 2;
     }
+
+    
 
     fn cld(&mut self) {
         if LOG_LEVEL > 0 {
@@ -951,6 +1028,59 @@ impl Computer {
         return 0;
     }
 
+
+    fn inc(&mut self, addressing_mode: ADRESSING_MODE) {
+        let mut value: u8 = 0;
+        let mode = addressing_mode;
+
+        let addr = self.get_ld_adddr(mode);
+        if addressing_mode == ADRESSING_MODE::ZERO_PAGE || addressing_mode == ADRESSING_MODE::ZERO_PAGE_X {
+            value = self.data[addr as usize];
+            self.add_info(format!("{:#x} - Running instruction inc ZP with effective addr: {:#x} and val: {:#x}", self.processor.pc, addr, value));
+            self.processor.pc += 2;
+            self.processor.clock += 5;
+        } else if addressing_mode == ADRESSING_MODE::ABSOLUTE || addressing_mode == ADRESSING_MODE::ABSOLUTE_X {
+            value = self.data[addr as usize];
+            self.add_info(format!("{:#x} - Running instruction inc ABS with effective addr: {:#x} and val: {:#x}", self.processor.pc, addr, value));
+            self.processor.pc += 3;
+            self.processor.clock += 6;
+        }
+
+        let result = value.wrapping_add(1);
+
+        let mut _addr = self.data.to_vec();
+        _addr[addr as usize] = result;
+        self.data = _addr;
+
+        self.processor.flags = Self::set_flags(self.processor.flags, result);
+    }
+
+    fn dec(&mut self, addressing_mode: ADRESSING_MODE) {
+        let mut value: u8 = 0;
+        let mode = addressing_mode;
+
+        let addr = self.get_ld_adddr(mode);
+        if addressing_mode == ADRESSING_MODE::ZERO_PAGE || addressing_mode == ADRESSING_MODE::ZERO_PAGE_X {
+            value = self.data[addr as usize];
+            self.add_info(format!("{:#x} - Running instruction dec ZP with effective addr: {:#x} and val: {:#x}", self.processor.pc, addr, value));
+            self.processor.pc += 2;
+            self.processor.clock += 5;
+        } else if addressing_mode == ADRESSING_MODE::ABSOLUTE || addressing_mode == ADRESSING_MODE::ABSOLUTE_X {
+            value = self.data[addr as usize];
+            self.add_info(format!("{:#x} - Running instruction dec ABS with effective addr: {:#x} and val: {:#x}", self.processor.pc, addr, value));
+            self.processor.pc += 3;
+            self.processor.clock += 6;
+        }
+
+        let result = value.wrapping_sub(1);
+
+        let mut _addr = self.data.to_vec();
+        _addr[addr as usize] = result;
+        self.data = _addr;
+
+        self.processor.flags = Self::set_flags(self.processor.flags, result);
+    }
+
     fn ldx(&mut self, addressing_mode: ADRESSING_MODE) {
         let mut value: u8 = 0;
         let mode = addressing_mode;
@@ -1048,7 +1178,7 @@ impl Computer {
             value = self.processor.acc;
             self.processor.pc += 1;
             self.processor.clock += 2;
-        } else if mode == ADRESSING_MODE::ABSOLUTE {
+        } else if mode == ADRESSING_MODE::ABSOLUTE || mode == ADRESSING_MODE::ABSOLUTE_X {
             self.processor.pc += 3;
             self.processor.clock += 6;
             value = self.data[addr as usize];
@@ -1088,7 +1218,7 @@ impl Computer {
 
         let mut value: u8 = 0;
         let addr = self.get_ld_adddr(mode);
-        if (mode == ADRESSING_MODE::ACCUMULATOR) {
+        if mode == ADRESSING_MODE::ACCUMULATOR {
             value = self.processor.acc;
         } else {
             value = self.data[addr as usize];
@@ -1113,13 +1243,19 @@ impl Computer {
         }
         self.add_info(format!("{:#x} - Running instruction lsr val: {:#x} result: {:#x} flags: {:#x} old flags: {:#x}", self.processor.pc, value, result, self.processor.flags, old_flags));
 
-        if (mode == ADRESSING_MODE::ACCUMULATOR) {
+        if mode == ADRESSING_MODE::ACCUMULATOR {
             self.processor.pc += 1;
             self.processor.clock += 2;
             self.processor.acc = result;
+        } else if mode == ADRESSING_MODE::ABSOLUTE || mode == ADRESSING_MODE::ABSOLUTE_X {
+            self.processor.pc += 3;
+            self.processor.clock += 6;
+            let mut _addr = self.data.to_vec();
+            _addr[addr as usize] = result;
+            self.data = _addr;
         } else {
             self.processor.pc += 2;
-            self.processor.clock += 6;
+            self.processor.clock += 5;
             let mut _addr = self.data.to_vec();
             _addr[addr as usize] = result;
             self.data = _addr;
@@ -1132,10 +1268,14 @@ impl Computer {
 
         let mut value: u8 = 0;
         let addr = self.get_ld_adddr(mode);
-        if (mode == ADRESSING_MODE::ACCUMULATOR) {
+        if mode == ADRESSING_MODE::ACCUMULATOR {
             value = self.processor.acc;
             self.processor.pc += 1;
             self.processor.clock += 2;
+        } else if mode == ADRESSING_MODE::ABSOLUTE || mode == ADRESSING_MODE::ABSOLUTE_X {
+            value = self.processor.acc;
+            self.processor.pc += 3;
+            self.processor.clock += 6;
         } else {
             self.processor.pc += 2;
             self.processor.clock += 6;
@@ -1174,10 +1314,14 @@ impl Computer {
 
         let mut value: u8 = 0;
         let addr = self.get_ld_adddr(mode);
-        if (mode == ADRESSING_MODE::ACCUMULATOR) {
+        if mode == ADRESSING_MODE::ACCUMULATOR {
             value = self.processor.acc;
             self.processor.pc += 1;
             self.processor.clock += 2;
+        } else if mode == ADRESSING_MODE::ABSOLUTE || mode == ADRESSING_MODE::ABSOLUTE_X {
+            value = self.processor.acc;
+            self.processor.pc += 3;
+            self.processor.clock += 6;
         } else {
             self.processor.pc += 2;
             self.processor.clock += 6;
@@ -1202,7 +1346,7 @@ impl Computer {
             self.processor.flags &= !FLAG_N;
         }
         self.add_info(format!("{:#x} - Running instruction ror val: {:#x} result: {:#x} flags: {:#x} old flags: {:#x}", self.processor.pc, value, result, self.processor.flags, old_flags));
-        if (mode == ADRESSING_MODE::ACCUMULATOR) {
+        if mode == ADRESSING_MODE::ACCUMULATOR {
             self.processor.acc = result;
         } else {
             let mut _addr = self.data.to_vec();
