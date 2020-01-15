@@ -9,23 +9,20 @@ pub fn layout() -> cursive::views::LinearLayout {
     for i in 0..32 {
         let mut h = LinearLayout::horizontal();
         h.add_child(
-            TextView::new("").with_id(format!("addr-{}", cnt).as_str())
+            TextView::new("aa").with_id(format!("addr-{}", cnt).as_str())
         );
-        h.add_child(DummyView.fixed_width(2));
-        for j in 0..16 {
-            h.add_child(
-                TextView::new("").with_id(format!("mem-{}", cnt).as_str())
-            );
-            if (j + 1) % 4 == 0 && j < 15 {
-                h.add_child(DummyView.fixed_width(2));
-            } else if j < 15 {
-                h.add_child(DummyView.fixed_width(1));
-            }
-            
-            cnt += 1;
-        }
-
         mem_view.add_child(h);
+        cnt += 1;
+    }
+    cnt = 0;
+
+    let mut st = LinearLayout::vertical();
+    for i in 0..16 {
+        st.add_child(
+            TextView::new("aa").with_id(format!("stack-{}", cnt).as_str())
+        );
+
+        cnt += 1;
     }
 
     LinearLayout::horizontal()
@@ -36,12 +33,13 @@ pub fn layout() -> cursive::views::LinearLayout {
                     mem_view
                 ).title("Memory")
             )
-            .child(
-                Dialog::around(
-                    TextView::new("OUTPUT").with_id("output")
-                ).title("Output")
-            )
+            // .child(
+            //     Dialog::around(
+            //         TextView::new("OUTPUT").with_id("output")
+            //     ).title("Output")
+            // )
         )
+
         .child(
             LinearLayout::vertical()
             .child(Dialog::around(
@@ -127,17 +125,36 @@ pub fn layout() -> cursive::views::LinearLayout {
                         TextView::new("").with_id("clock").fixed_width(10)
                     )
                 )
+                .child(
+                    DummyView.fixed_width(2)
+                )
+                .child(
+                    LinearLayout::vertical()
+                    .child(
+                        TextView::new("Speed")
+                    )
+                    .child(
+                        TextView::new("").with_id("speed").fixed_width(8)
+                    )
+                )
                 
-            ).title("Processor info").fixed_width(80))
+            ).title("Processor info"))
             .child(Dialog::around(
                 TextView::new("PROC INFO").with_id("info")
-            ).title("Debug info").fixed_width(80).scrollable())
-            .child(Dialog::around(
-                TextView::new("T").with_id("test")
-            ).title("Current test").fixed_width(80).scrollable())
-            .child(Dialog::around(
-                TextView::new("T").with_id("stack")
-            ).title("Stack").fixed_width(80).scrollable())
+            ).title("Debug info").fixed_width(84).fixed_height(20).scrollable())
+            .child(
+                LinearLayout::horizontal().child(
+                    Dialog::around(
+                        st
+                    ).title("Stack").fixed_width(64).fixed_height(18)
+                )
+                .child(
+                    Dialog::around(
+                        TextView::new("0").with_id("test")
+                    ).title("Current test").fixed_width(20)
+                )
+                
+            )
             
         )
             

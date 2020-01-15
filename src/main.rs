@@ -10,6 +10,7 @@ use cursive::view::*;
 use cursive::views::*;
 use std::sync::mpsc;
 use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 mod computer;
 mod utils;
@@ -22,6 +23,8 @@ pub struct Ui {
     ui_tx: mpsc::Sender<UiMessage>,
     controller_tx: mpsc::Sender<ControllerMessage>,
     data: Vec<u8>,
+    clk: u64,
+    t: u128,
 }
 
 pub enum UiMessage {
@@ -37,12 +40,15 @@ impl Ui {
     /// by the UI to send messages to the controller.
     pub fn new(controller_tx: mpsc::Sender<ControllerMessage>) -> Ui {
         let (ui_tx, ui_rx) = mpsc::channel::<UiMessage>();
+        let t = SystemTime::now().duration_since(UNIX_EPOCH).expect("fail");
         let mut ui = Ui {
             cursive: Cursive::default(),
             ui_tx: ui_tx,
             ui_rx: ui_rx,
             controller_tx: controller_tx,
             data: vec![],
+            clk: 0,
+            t: t.as_millis(),
         };
 
         // Create a view tree with a TextArea for input, and a
@@ -111,33 +117,47 @@ impl Ui {
                     let mut output = self.cursive
                         .find_id::<TextView>("flags")
                         .unwrap();
-                    output.set_content(format!("{:b}", processor.flags));
+                    output.set_content(format!("{:08b}", processor.flags));
 
                     let mut output = self.cursive
                         .find_id::<TextView>("pc")
                         .unwrap();
-                    output.set_content(format!("{} ({:#x})", processor.pc, processor.pc));
+                    output.set_content(format!("{} ({:#06x})", processor.pc, processor.pc));
                     let mut output = self.cursive
                         .find_id::<TextView>("acc")
                         .unwrap();
-                    output.set_content(format!("{:#x}", processor.acc));
+                    output.set_content(format!("{:#04x}", processor.acc));
                     let mut output = self.cursive
                         .find_id::<TextView>("rx")
                         .unwrap();
-                    output.set_content(format!("{:#x}", processor.rx));
+                    output.set_content(format!("{:#04x}", processor.rx));
                     let mut output = self.cursive
                         .find_id::<TextView>("ry")
                         .unwrap();
-                    output.set_content(format!("{:#x}", processor.ry));
+                    output.set_content(format!("{:#04x}", processor.ry));
                     let mut output = self.cursive
                         .find_id::<TextView>("sp")
                         .unwrap();
-                    output.set_content(format!("{:#x}", processor.sp));
+                    output.set_content(format!("{:#04x}", processor.sp));
 
                     let mut output = self.cursive
                         .find_id::<TextView>("clock")
                         .unwrap();
                     output.set_content(format!("{}", processor.clock));
+                    
+                    let start = SystemTime::now().duration_since(UNIX_EPOCH).expect("fail");
+                    let t = start.as_millis();
+
+
+                    if t - self.t > 1000 {
+                        let sp = processor.clock - self.clk;
+                        self.clk = processor.clock;
+                        self.t = t;
+                        let mut speed = self.cursive
+                            .find_id::<TextView>("speed")
+                            .unwrap();
+                        speed.set_content(format!("{:.2} MHz", sp as f64 / 1000000.0));
+                    }
                     
 
                     let mut info = self.cursive
@@ -177,27 +197,27 @@ impl Ui {
 
                     let mut iter = out[btm as usize ..=top as usize].iter();
                     let mut cnt = 0;
+
                     while let Some(line) = iter.next() {
                         let mut inner = line.iter();
-                        let atv = self.cursive.find_id::<TextView>(format!("addr-{}", cnt).as_str());
+                        let mut text = "".to_string();
 
-                        if let Some(mut aview) = atv {
-                            aview.set_content(format!("{:#06x}", (btm << 4) + cnt));
-                        }
+                        let atv = self.cursive.find_id::<TextView>(format!("addr-{}", cnt >> 4).as_str());
+                        let addr = (btm << 4) + cnt;
                         while let Some(item) = inner.next() {
-                            let tv = self.cursive.find_id::<TextView>(format!("mem-{}", cnt).as_str());
-
-                            if let Some(mut view) = tv {
-                                view.set_content(format!("{:02x}", item));
-                                if processor.pc == cnt + (btm << 4) {
-                                    view.set_effect(Effect::Reverse);
-                                } else {
-                                    view.set_effect(Effect::Simple);
-                                }
+                            
+                            if cnt % 4 == 0 {
+                                text = format!("{}  {:02x}", text.as_str(), item);
+                            } else {
+                                text = format!("{} {:02x}", text.as_str(), item);
                             }
-
                             cnt += 1;
                         }
+
+                        if let Some(mut aview) = atv {
+                            aview.set_content(format!("{:#06x}  {}", addr, text));
+                        }
+
                     }
                     // Update memory display here
 
@@ -208,21 +228,55 @@ impl Ui {
                     self.data[addr as usize] = data;
                 },
                 UiMessage::UpdateStack(data) => {
-                    let mut output = self.cursive
-                        .find_id::<TextView>("stack")
-                        .unwrap();
-                    output.set_content(format!("{:x?}", data));
+                    let mut cnt = 0;
+                    let out: Vec<&[u8]> = data.chunks(16).collect();
+                    let mut iter = out.iter();
+
+                    while let Some(line) = iter.next() {
+                        let mut inner = line.iter();
+                        let mut text = "".to_string();
+
+                        let atv = self.cursive.find_id::<TextView>(format!("stack-{}", cnt >> 4).as_str());
+                        let addr = 0x100 + cnt;
+
+                        while let Some(item) = inner.next() {
+                            
+                            if cnt % 4 == 0 {
+                                text = format!("{}  {:02x}", text.as_str(), item);
+                            } else {
+                                text = format!("{} {:02x}", text.as_str(), item);
+                            }
+                            cnt += 1;
+                        }
+
+                        if let Some(mut aview) = atv {
+                            aview.set_content(format!("{:#06x}  {}", addr, text));
+                        }
+                    }
                 },
                 UiMessage::UpdateOutput(data) => {
-                    let mut output = self.cursive
-                        .find_id::<TextView>("output")
-                        .unwrap();
-
-                        //println!("{:?}", data);
-                        let stdout = io::stdout();
-                        let mut handle = stdout.lock();
-
-                        handle.write_all(&data);
+                    if let Some(mut output) = self.cursive.find_id::<TextView>("output") {
+                        let mut cnt = 0;
+                        let out: Vec<&[u8]> = data.chunks(16).collect();
+                        let mut iter = out.iter();
+                        let mut text = "".to_string();
+                        while let Some(line) = iter.next() {
+                            let mut inner = line.iter();
+                            
+                            let addr = 0xf000 + cnt;
+                            text = format!("{}{:#06x}  ", text.as_str(), addr);
+                            while let Some(item) = inner.next() {
+                                if cnt % 4 == 0 {
+                                    text = format!("{}  {:02x}", text.as_str(), item);
+                                } else {
+                                    text = format!("{} {:02x}", text.as_str(), item);
+                                }
+                                cnt += 1;
+                            }
+                            text = format!("{}\n", text.as_str());
+                        }
+                        output.set_content(text);
+                    }   
                 },
                 UiMessage::FullData(data) => {
                     self.data = data;

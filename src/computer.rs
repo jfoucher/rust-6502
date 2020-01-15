@@ -9,7 +9,10 @@ pub struct Info {
     pub qty: u64,
 }
 
-const LOG_LEVEL:i16 = 0;
+const LOG_LEVEL:i16 = 1;
+
+const OUTPUT_BTM:u16 = 0xf000;
+const OUTPUT_TOP:u16 = 0xf100;
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 pub enum ADRESSING_MODE {
@@ -60,6 +63,7 @@ pub struct Computer {
     processor: Processor,
     paused: bool,
     step: bool,
+    start: bool,
     speed: u64,
     data: Vec<u8>,
     tx: mpsc::Sender<ControllerMessage>,
@@ -81,6 +85,7 @@ impl Computer {
             tx,
             rx,
             paused: true,
+            start: true,
             step: false,
             speed: 0,
             processor: Processor {
@@ -124,7 +129,8 @@ impl Computer {
                     }
                 },
                 ComputerMessage::GetData() => {
-                    if (self.paused && self.step) || !self.paused {
+                    if (self.paused && self.step) || !self.paused || self.start {
+                        self.start = false;
                         let l = self.processor.info.len();
                         if l > 30 {
                             self.processor.info = self.processor.info[l-30..].to_vec();
@@ -134,15 +140,6 @@ impl Computer {
                         self.tx.send(
                             ControllerMessage::UpdatedProcessorAvailable(self.processor.clone())
                         );
-                        // //only send a slice of the data
-                        // let btm :u16 = if self.processor.pc > 256 { (self.processor.pc - 255) }else {0};
-                        // let top :u16 = if (self.processor.pc < 0xffff - 256) { self.processor.pc + 256} else { 0xffff };
-    
-                        // // let btm = 0x100;
-                        // // let top = 0x1ff;
-                        // let mem_to_display = self.data[btm as usize ..=top as usize].to_vec();
-    
-                        
     
                         let stack = self.data[0x100 as usize..=0x1ff as usize].to_vec();
     
@@ -150,7 +147,7 @@ impl Computer {
                             ControllerMessage::UpdatedStackAvailable(stack)
                         );
     
-                        let output = self.data[0xf000 as usize..0xf100 as usize].to_vec();
+                        let output = self.data[OUTPUT_BTM as usize..OUTPUT_TOP as usize].to_vec();
     
                         self.tx.send(
                             ControllerMessage::UpdatedOutputAvailable(output)
