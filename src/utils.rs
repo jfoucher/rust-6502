@@ -3,7 +3,6 @@ use cursive::view::*;
 
 
 pub fn layout() -> cursive::views::LinearLayout {
-
     LinearLayout::horizontal()
         .child(
             LinearLayout::vertical()
@@ -118,3 +117,5 @@ pub fn layout() -> cursive::views::LinearLayout {
         )
             
 }
+
+
