@@ -3,12 +3,37 @@ use cursive::view::*;
 
 
 pub fn layout() -> cursive::views::LinearLayout {
+    let mut mem_view = LinearLayout::vertical();
+    let mut cnt = 0;
+
+    for i in 0..32 {
+        let mut h = LinearLayout::horizontal();
+        h.add_child(
+            TextView::new("").with_id(format!("addr-{}", cnt).as_str())
+        );
+        h.add_child(DummyView.fixed_width(2));
+        for j in 0..16 {
+            h.add_child(
+                TextView::new("").with_id(format!("mem-{}", cnt).as_str())
+            );
+            if (j + 1) % 4 == 0 && j < 15 {
+                h.add_child(DummyView.fixed_width(2));
+            } else if j < 15 {
+                h.add_child(DummyView.fixed_width(1));
+            }
+            
+            cnt += 1;
+        }
+
+        mem_view.add_child(h);
+    }
+
     LinearLayout::horizontal()
         .child(
             LinearLayout::vertical()
             .child(
                 Dialog::around(
-                    TextView::new("TEST MEM").with_id("memory")
+                    mem_view
                 ).title("Memory")
             )
             .child(
@@ -27,7 +52,7 @@ pub fn layout() -> cursive::views::LinearLayout {
                         TextView::new("Flags")
                     )
                     .child(
-                        TextView::new("").with_id("flags")
+                        TextView::new("").with_id("flags").fixed_width(10)
                     )
                 )
                 .child(
@@ -39,7 +64,7 @@ pub fn layout() -> cursive::views::LinearLayout {
                         TextView::new("PC")
                     )
                     .child(
-                        TextView::new("").with_id("pc")
+                        TextView::new("").with_id("pc").fixed_width(15)
                     )
                 )
                 .child(
@@ -51,7 +76,7 @@ pub fn layout() -> cursive::views::LinearLayout {
                         TextView::new("Acc")
                     )
                     .child(
-                        TextView::new("").with_id("acc")
+                        TextView::new("").with_id("acc").fixed_width(5)
                     )
                 )
                 .child(
@@ -63,7 +88,7 @@ pub fn layout() -> cursive::views::LinearLayout {
                         TextView::new("Rx")
                     )
                     .child(
-                        TextView::new("").with_id("rx")
+                        TextView::new("").with_id("rx").fixed_width(5)
                     )
                 )
                 .child(
@@ -75,7 +100,7 @@ pub fn layout() -> cursive::views::LinearLayout {
                         TextView::new("Ry")
                     )
                     .child(
-                        TextView::new("").with_id("ry")
+                        TextView::new("").with_id("ry").fixed_width(5)
                     )
                 )
                 .child(
@@ -87,7 +112,7 @@ pub fn layout() -> cursive::views::LinearLayout {
                         TextView::new("SP")
                     )
                     .child(
-                        TextView::new("").with_id("sp")
+                        TextView::new("").with_id("sp").fixed_width(5)
                     )
                 )
                 .child(
@@ -99,7 +124,7 @@ pub fn layout() -> cursive::views::LinearLayout {
                         TextView::new("Clock")
                     )
                     .child(
-                        TextView::new("").with_id("clock")
+                        TextView::new("").with_id("clock").fixed_width(10)
                     )
                 )
                 

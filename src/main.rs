@@ -4,6 +4,7 @@ use std::io;
 use std::io::Write;
 use std::fs;
 use cursive::Cursive;
+use cursive::theme::Effect;
 use cursive::event::Key;
 use cursive::view::*;
 use cursive::views::*;
@@ -20,11 +21,13 @@ pub struct Ui {
     ui_rx: mpsc::Receiver<UiMessage>,
     ui_tx: mpsc::Sender<UiMessage>,
     controller_tx: mpsc::Sender<ControllerMessage>,
+    data: Vec<u8>,
 }
 
 pub enum UiMessage {
     UpdateProcessor(Processor),
-    UpdateData(Vec<u8>),
+    UpdateData(u16, u8),
+    FullData(Vec<u8>),
     UpdateStack(Vec<u8>),
     UpdateOutput(Vec<u8>),
 }
@@ -39,6 +42,7 @@ impl Ui {
             ui_tx: ui_tx,
             ui_rx: ui_rx,
             controller_tx: controller_tx,
+            data: vec![],
         };
 
         // Create a view tree with a TextArea for input, and a
@@ -129,7 +133,7 @@ impl Ui {
                         .find_id::<TextView>("sp")
                         .unwrap();
                     output.set_content(format!("{:#x}", processor.sp));
-                    
+
                     let mut output = self.cursive
                         .find_id::<TextView>("clock")
                         .unwrap();
@@ -159,12 +163,49 @@ impl Ui {
                         .find_id::<TextView>("test")
                         .unwrap();
                     output.set_content(format!("{}", processor.test[0]));
+
+                    // chunk data
+                    
+                    //let out = (&self.data).chunks(16);
+                    let out: Vec<&[u8]> = self.data.chunks(16).collect();
+                    let center = processor.pc >> 4;
+
+                    //println!("center: {:#x} - number of lines : {}", center, out.len());
+
+                    let btm: u16 = if center - 16 < 0 { 0 } else { center - 16 };
+                    let top: u16 = if center + 16 > out.len() as u16 { out.len() as u16 } else { center + 16 };
+
+                    let mut iter = out[btm as usize ..=top as usize].iter();
+                    let mut cnt = 0;
+                    while let Some(line) = iter.next() {
+                        let mut inner = line.iter();
+                        let atv = self.cursive.find_id::<TextView>(format!("addr-{}", cnt).as_str());
+
+                        if let Some(mut aview) = atv {
+                            aview.set_content(format!("{:#06x}", (btm << 4) + cnt));
+                        }
+                        while let Some(item) = inner.next() {
+                            let tv = self.cursive.find_id::<TextView>(format!("mem-{}", cnt).as_str());
+
+                            if let Some(mut view) = tv {
+                                view.set_content(format!("{:02x}", item));
+                                if processor.pc == cnt + (btm << 4) {
+                                    view.set_effect(Effect::Reverse);
+                                } else {
+                                    view.set_effect(Effect::Simple);
+                                }
+                            }
+
+                            cnt += 1;
+                        }
+                    }
+                    // Update memory display here
+
+                    // break full data by lines of 32 bytes
+                    // Center vertically on processor.pc
                 },
-                UiMessage::UpdateData(data) => {
-                    let mut output = self.cursive
-                        .find_id::<TextView>("memory")
-                        .unwrap();
-                    output.set_content(format!("{:x?}", data));
+                UiMessage::UpdateData(addr, data) => {
+                    self.data[addr as usize] = data;
                 },
                 UiMessage::UpdateStack(data) => {
                     let mut output = self.cursive
@@ -182,9 +223,11 @@ impl Ui {
                         let mut handle = stdout.lock();
 
                         handle.write_all(&data);
-
-
                 },
+                UiMessage::FullData(data) => {
+                    self.data = data;
+                },
+                _ => {},
             }
         }
 
@@ -206,21 +249,30 @@ impl Controller {
     /// Create a new controller
     pub fn new(filename: String) -> Result<Controller, String> {
         let data = fs::read(filename).expect("could not read file");
+        
         let (tx, rx) = mpsc::channel::<ControllerMessage>();
         let controller_tx = tx.clone();
         let (computer_tx, computer_rx) = mpsc::channel::<ComputerMessage>();
+        let computer_data = data.clone();
         let child = thread::spawn(move || {
-            let mut computer = Computer::new(controller_tx, computer_rx, data);
+            let mut computer = Computer::new(controller_tx, computer_rx, computer_data);
             loop {
                 computer.step();
             }
         });
         
 
+        let ui = Ui::new(tx.clone());
+
+        ui
+            .ui_tx
+            .send(UiMessage::FullData(data))
+            .unwrap();
+
         Ok(Controller {
             rx: rx,
             ctx: computer_tx.clone(),
-            ui: Ui::new(tx.clone()),
+            ui,
         })
     }
     /// Run the controller
@@ -244,11 +296,11 @@ impl Controller {
                             .unwrap();
                         //self.computer.step();
                     },
-                    ControllerMessage::UpdatedDataAvailable(data) => {
-                        self.ui
-                            .ui_tx
-                            .send(UiMessage::UpdateData(data))
-                            .unwrap();
+                    ControllerMessage::UpdatedDataAvailable(addr, data) => {
+                        // self.ui
+                        //     .ui_tx
+                        //     .send(UiMessage::UpdateData(data))
+                        //     .unwrap();
                     },
 
                     ControllerMessage::UpdatedStackAvailable(data) => {
