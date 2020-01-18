@@ -9,7 +9,7 @@ pub struct Info {
     pub qty: u64,
 }
 
-const LOG_LEVEL:i16 = 1;
+const LOG_LEVEL:i16 = 0;
 
 const OUTPUT_BTM:u16 = 0xf000;
 const OUTPUT_TOP:u16 = 0xf100;
@@ -129,7 +129,7 @@ impl Computer {
                     }
                 },
                 ComputerMessage::GetData() => {
-                    if (self.paused && self.step) || !self.paused || self.start {
+                    //if (self.paused && self.step) || self.start {
                         self.start = false;
                         let l = self.processor.info.len();
                         if l > 30 {
@@ -152,7 +152,7 @@ impl Computer {
                         self.tx.send(
                             ControllerMessage::UpdatedOutputAvailable(output)
                         );
-                    }
+                    //}
                 },
             };
         }
@@ -176,13 +176,13 @@ impl Computer {
 
 
     fn run_instruction(&mut self) {
-        let inst = self.data[(self.processor.pc) as usize];
-        self.processor.inst = inst;
-        let opcode = decode::get_opcode_name(inst);
+        let inst = &self.data[(self.processor.pc) as usize];
+        self.processor.inst = *inst;
+        let opcode = decode::get_opcode_name(self.processor.inst);
 
         //self.add_info(format!("{:#x} - running instruction {} ({:#x})", self.processor.pc, opcode, inst));
 
-        match opcode.as_str() {
+        match opcode {
             "ADC" => self.adc(),
             "AND" => self.and(),
             "ASL" => self.asl(),
@@ -361,14 +361,9 @@ impl Computer {
         self.processor.flags |= FLAG_I;
         self.processor.sp = self.processor.sp.wrapping_sub(3);
         
-        //Save to stack with interrupt disable bit set
-        
-        
         self.data = _addr;
 
-        let low_byte = self.data[0xfffe as usize];
-        let high_byte = self.data[0xffff as usize];
-        let new_addr: u16 = low_byte as u16 | ((high_byte as u16) << 8) as u16;
+        let new_addr: u16 = self.get_word(0xfffe);
         if LOG_LEVEL > 0 {
             self.add_info(format!("{:#x} - Running instruction brk ({:#x}) to: {:#x} flags: {:#b}", self.processor.pc, self.processor.inst, new_addr, self.processor.flags));
         }
@@ -1139,7 +1134,7 @@ self.add_info(format!("{:#x} - Running instruction cmp: {:#x} with acc: {:#x} va
         } else if addressing_mode == ADRESSING_MODE::ZERO_PAGE {
             value = self.data[addr as usize];
         } else {
-            panic!("Unknown address type");
+            panic!("Unknown address type {:?} {:#b}, {:#x}", addressing_mode, self.processor.inst, self.processor.inst);
         }
         
         let mut flags = self.processor.flags;
@@ -1328,21 +1323,24 @@ self.add_info(format!("{:#x} - Running instruction jmp: {:#x} to: {:#x}", self.p
         let should_jump = (self.processor.flags >> 1) & 1 == 0;
         let mut new_addr :u16;
         new_addr = self.processor.pc + 2;
-        let mut info = format!("{:#x} - Running instruction bne NOT jumping to: {:#x} flags: {:#x}", self.processor.pc, new_addr, self.processor.flags);
-
+        
         if (should_jump) {
             let rel_address = offset as i8;
             // // println!("Jumping offset {:?}", rel_address);
             new_addr = ((new_addr as i32) + (rel_address as i32)) as u16;
-            info = format!("{:#x} - Running instruction bne {:#x} jumping to: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags);
+            if LOG_LEVEL > 0 {
+                self.add_info(format!("{:#x} - Running instruction bne {:#x} jumping to: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags));
+            }
+        } else {
+            if LOG_LEVEL > 0 {
+                self.add_info(format!("{:#x} - Running instruction bne NOT jumping to: {:#x} flags: {:#x}", self.processor.pc, new_addr, self.processor.flags));
+            }
         }
 
         self.processor.clock += 3;
         self.processor.pc = new_addr;
 
-        if LOG_LEVEL > 0 {
-self.add_info(info);
-}
+        
 
     }
 
@@ -1352,19 +1350,23 @@ self.add_info(info);
         // // println!("Jumping RAW offset is {:?} or 0x{:x?}", offset, offset);
         let should_jump = self.processor.flags & FLAG_Z != 0;
         let mut new_addr :u16 = self.processor.pc + 2;
-        let mut info = format!("{:#x} - Running instruction beq not jumping to: {:#x} flags: {:#x}", self.processor.pc, new_addr, self.processor.flags);
+        
 
         if (should_jump) {
             let rel_address = offset as i8;
             // // println!("Jumping offset {:?}", rel_address);
             new_addr = ((new_addr as i32) + (rel_address as i32)) as u16;
-            info = format!("{:#x} - Running instruction beq {:#x} jumping to: {:#x} flags: {:#x} offset {}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags, offset as i8);
+            if LOG_LEVEL > 0 {
+                self.add_info(format!("{:#x} - Running instruction beq {:#x} jumping to: {:#x} flags: {:#x} offset {}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags, offset as i8));
+            }
+        } else {
+            if LOG_LEVEL > 0 {
+                self.add_info(format!("{:#x} - Running instruction beq not jumping to: {:#x} flags: {:#x}", self.processor.pc, new_addr, self.processor.flags));
+            }
         }
         self.processor.clock += 3;
         self.processor.pc = new_addr;
-        if LOG_LEVEL > 0 {
-self.add_info(info);
-}
+        
     }
 
     /// Branch if carry clear
@@ -1373,17 +1375,19 @@ self.add_info(info);
         // // println!("Jumping RAW offset is {:?} or 0x{:x?}", offset, offset);
         let should_jump = self.processor.flags & FLAG_C == 0;
         let mut new_addr = self.processor.pc + 2;
-        let mut info = format!("{:#x} - Running instruction bcc NOT jumping to: {:#x} flags: {:#x} offset: {}", self.processor.pc, new_addr, self.processor.flags, offset as i8);
         
         if (should_jump) {
             let rel_address = offset as i8;
             // // println!("Jumping offset {:?}", rel_address);
             new_addr = ((new_addr as i32) + (rel_address as i32)) as u16;
-            info = format!("{:#x} - Running instruction bcc jumping to: {:#x} flags: {:#x} offset: {}", self.processor.pc, new_addr, self.processor.flags, offset as i8);
+            if LOG_LEVEL > 0 {
+                self.add_info(format!("{:#x} - Running instruction bcc jumping to: {:#x} flags: {:#x} offset: {}", self.processor.pc, new_addr, self.processor.flags, offset as i8));
+            }
+        } else {
+            if LOG_LEVEL > 0 {
+                self.add_info(format!("{:#x} - Running instruction bcc NOT jumping to: {:#x} flags: {:#x} offset: {}", self.processor.pc, new_addr, self.processor.flags, offset as i8));
+            }
         }
-        if LOG_LEVEL > 0 {
-self.add_info(info);
-}
         self.processor.clock += 3;
         self.processor.pc = new_addr;
     }
@@ -1394,17 +1398,19 @@ self.add_info(info);
         // // println!("Jumping RAW offset is {:?} or 0x{:x?}", offset, offset);
         let should_jump = (self.processor.flags) & FLAG_C == 1;
         let mut new_addr :u16 = self.processor.pc + 2;
-        let mut info = format!("{:#x} - Running instruction bcs not jumping to: {:#x} flags: {:#x}", self.processor.pc, new_addr, self.processor.flags);
 
         if (should_jump) {
             let rel_address = offset as i8;
             // // println!("Jumping offset {:?}", rel_address);
             new_addr = ((new_addr as i32) + (rel_address as i32)) as u16;
-            info = format!("{:#x} - Running instruction bcs {:#x} jumping to: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags);
+            if LOG_LEVEL > 0 {
+                self.add_info(format!("{:#x} - Running instruction bcs {:#x} jumping to: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags));
+            } else {
+                if LOG_LEVEL > 0 {
+                    self.add_info(format!("{:#x} - Running instruction bcs not jumping to: {:#x} flags: {:#x}", self.processor.pc, new_addr, self.processor.flags));
+                }
+            }
         }
-        if LOG_LEVEL > 0 {
-self.add_info(info);
-}
         self.processor.clock += 3;
         self.processor.pc = new_addr;
         
@@ -1416,17 +1422,20 @@ self.add_info(info);
         // // println!("Jumping RAW offset is {:?} or 0x{:x?}", offset, offset);
         let should_jump = self.processor.flags & FLAG_O == 0;
         let mut new_addr = self.processor.pc + 2;
-        let mut info = format!("{:#x} - Running instruction bvc NOT jumping to: {:#x} flags: {:#x} offset: {}", self.processor.pc, new_addr, self.processor.flags, offset as i8);
         
         if (should_jump) {
             let rel_address = offset as i8;
             // // println!("Jumping offset {:?}", rel_address);
             new_addr = ((new_addr as i32) + (rel_address as i32)) as u16;
-            info = format!("{:#x} - Running instruction bvc jumping to: {:#x} flags: {:#x} offset: {}", self.processor.pc, new_addr, self.processor.flags, offset as i8);
+            if LOG_LEVEL > 0 {
+                self.add_info(format!("{:#x} - Running instruction bvc {:#x} jumping to: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags));
+            }
+        } else {
+            if LOG_LEVEL > 0 {
+                self.add_info(format!("{:#x} - Running instruction bvc {:#x} NOT jumping to: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags));
+            }
         }
-        if LOG_LEVEL > 0 {
-self.add_info(info);
-}
+        
         self.processor.clock += 3;
         self.processor.pc = new_addr;
     }
@@ -1437,17 +1446,19 @@ self.add_info(info);
         // // println!("Jumping RAW offset is {:?} or 0x{:x?}", offset, offset);
         let should_jump = self.processor.flags & FLAG_O != 0;
         let mut new_addr = self.processor.pc + 2;
-        let mut info = format!("{:#x} - Running instruction bvc NOT jumping to: {:#x} flags: {:#x} offset: {}", self.processor.pc, new_addr, self.processor.flags, offset as i8);
-        
+           
         if (should_jump) {
             let rel_address = offset as i8;
             // // println!("Jumping offset {:?}", rel_address);
             new_addr = ((new_addr as i32) + (rel_address as i32)) as u16;
-            info = format!("{:#x} - Running instruction bvc jumping to: {:#x} flags: {:#x} offset: {}", self.processor.pc, new_addr, self.processor.flags, offset as i8);
+            if LOG_LEVEL > 0 {
+                self.add_info(format!("{:#x} - Running instruction bvs {:#x} jumping to: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags));
+            }  
+        } else {
+            if LOG_LEVEL > 0 {
+                self.add_info(format!("{:#x} - Running instruction bvs {:#x} NOT jumping to: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags));
+            }
         }
-        if LOG_LEVEL > 0 {
-self.add_info(info);
-}
         self.processor.clock += 3;
         self.processor.pc = new_addr;
     }
@@ -1458,18 +1469,14 @@ self.add_info(info);
         let should_jump = (self.processor.flags >> 7) & 1 == 0;
         let mut new_addr :u16;
         new_addr = self.processor.pc + 2;
-        let mut info = format!("{:#x} - Running instruction bpl not jumping: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], self.processor.flags);
         if (should_jump) {
             let rel_address = offset as i8;
             // println!("BPL Jumping offset {:?}", rel_address);
             new_addr = ((new_addr as i32) + (rel_address as i32)) as u16;
-            info = format!("{:#x} - Running instruction bpl {:#x} jumping to: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags);
         }
         self.processor.pc = new_addr;
         self.processor.clock += 3;
-        if LOG_LEVEL > 0 {
-self.add_info(info);
-}
+        
     }
 
     /// Branch if negative flag is set
@@ -1479,18 +1486,14 @@ self.add_info(info);
         let should_jump = (self.processor.flags >> 7) & 1 == 1;
         let mut new_addr :u16;
         new_addr = self.processor.pc + 2;
-        let mut info = format!("{:#x} - Running instruction bmi not jumping: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], self.processor.flags);
         if (should_jump) {
             let rel_address = offset as i8;
             // println!("BPL Jumping offset {:?}", rel_address);
             new_addr = ((new_addr as i32) + (rel_address as i32)) as u16;
-            info = format!("{:#x} - Running instruction bmi {:#x} jumping to: {:#x} flags: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize], new_addr, self.processor.flags);
         }
         self.processor.pc = new_addr;
         self.processor.clock += 3;
-        if LOG_LEVEL > 0 {
-self.add_info(info);
-}
+        
     }
 
     fn get_logical_op_value(&mut self) -> u8 {
@@ -1515,8 +1518,8 @@ self.add_info(info);
             self.processor.clock += 4;
         } else {
             if LOG_LEVEL > 0 {
-self.add_info(format!("{:#x} - this addressing mode not implemented for instruction {:?}", self.processor.pc, addressing_mode));
-}
+                self.add_info(format!("{:#x} - this addressing mode not implemented for instruction {:?}", self.processor.pc, addressing_mode));
+            }
         }
     }
 
@@ -1564,11 +1567,40 @@ self.add_info(format!("{:#x} - Running instruction ora {:#x} with acc: {:#x} val
         let addressing_mode = decode::get_adressing_mode(self.processor.inst);
         let addr = self.get_ld_adddr(addressing_mode);
         let val = self.data[addr as usize];
-        let carry = self.processor.flags & FLAG_C;
-        let sum = self.do_add(val);
+        let acc = self.processor.acc;
+        let mut carry = self.processor.flags & FLAG_C != 0;
+        let decimal = self.processor.flags & FLAG_D != 0;
+
+        let mut sum = 0;
+
+        if (decimal) {
+            let mut s: u16 = 0;
+            let mut ln = (acc & 0xF) + (val &0xF) + (self.processor.flags & FLAG_C);
+            if (ln > 9) {
+                ln = 0x10 | ((ln + 6) & 0xf);
+            }
+            let mut hn: u16 = (acc & 0xf0) as u16 + (val & 0xf0) as u16;
+            s = hn + ln as u16;
+
+            
+
+            if (s >= 160) {
+                self.processor.flags |= FLAG_C;
+                if ((self.processor.flags & FLAG_O) != 0 && s >= 0x180) { self.processor.flags &= !FLAG_O; }
+                s += 0x60;
+            } else {
+                self.processor.flags &= !FLAG_C;
+                if ((self.processor.flags & FLAG_O) != 0 && s < 0x80) { self.processor.flags &= !FLAG_O; }
+            }
+            sum  = (s & 0xff) as u8;
+            self.processor.flags = Self::set_flags(self.processor.flags, sum);
+        } else {
+            sum = self.do_add(val);
+        }
+        
 
         if LOG_LEVEL > 0 {
-self.add_info(format!("{:#x} - Running instruction adc with acc: {:#x} memval: {:#x} flags: {:#x} carry: {}", self.processor.pc, self.processor.acc, val, self.processor.flags, carry));
+self.add_info(format!("{:#x} - Running instruction adc with acc: {:#x} memval: {:#x} flags: {:#x} carry: {} result: {:#x}", self.processor.pc, self.processor.acc, val, self.processor.flags, carry, sum));
 }
         self.processor.acc = sum;
         self.after_logical_op();
@@ -1578,13 +1610,62 @@ self.add_info(format!("{:#x} - Running instruction adc with acc: {:#x} memval: {
         let addressing_mode = decode::get_adressing_mode(self.processor.inst);
         let addr = self.get_ld_adddr(addressing_mode);
         let val = self.data[addr as usize];
-        
-        let sum = self.do_add(!val);
+        let decimal = self.processor.flags & FLAG_D != 0;
+        let acc= self.processor.acc;
+
+        let mut carry: bool = false;
+        let mut sum = 0;
+
+        if (decimal) {
+
+            // tmp = 0xf + (regA & 0xf) - (value & 0xf) + carrySet();
+            // if (tmp < 0x10) {
+            // w = 0;
+            // tmp -= 6;
+            // } else {
+            // w = 0x10;
+            // tmp -= 0x10;
+            // }
+            // w += 0xf0 + (regA & 0xf0) - (value & 0xf0);
+            // if (w < 0x100) {
+            // CLC();
+            // if (overflowSet() && w < 0x80) { CLV(); }
+            // w -= 0x60;
+            // } else {
+            // SEC();
+            // if (overflowSet() && w >= 0x180) { CLV(); }
+            // }
+            // w += tmp;
+
+
+            let mut w: u16;
+            let mut tmp = 0xf + (acc & 0xf) - (val & 0xf) + (self.processor.flags & FLAG_C);
+            if (tmp < 0x10) {
+                w = 0;
+              tmp -= 6;
+            } else {
+              w = 0x10;
+              tmp -= 0x10;
+            }
+            w += 0xf0 + ((acc as u16) & 0xf0) - ((val as u16) & 0xf0);
+            if (w < 0x100) {
+              self.processor.flags &= !FLAG_C;
+              if ((self.processor.flags & FLAG_O) != 0 && w < 0x80) { self.processor.flags &= !FLAG_O; }
+              w -= 0x60;
+            } else {
+                self.processor.flags |= FLAG_C;
+              if ((self.processor.flags & FLAG_O) != 0  && w >= 0x180) { self.processor.flags &= !FLAG_O; }
+            }
+            w += tmp as u16;
+            sum = w as u8
+        } else {
+            sum = self.do_add(!val);
+        }
 
         if LOG_LEVEL > 0 {
-self.add_info(format!("{:#x} - Running instruction sbc with acc: {:#x} memval: {:#x} flags: {:#x}", self.processor.pc, self.processor.acc, val, self.processor.flags));
-}
-        self.processor.acc = sum;
+            self.add_info(format!("{:#x} - Running instruction sbc with acc: {:#x} memval: {:#x} flags: {:#x}", self.processor.pc, self.processor.acc, val, self.processor.flags));
+        }
+        self.processor.acc = sum as u8;
         self.after_logical_op();
     }
 
@@ -1593,10 +1674,13 @@ self.add_info(format!("{:#x} - Running instruction sbc with acc: {:#x} memval: {
         let mut carry = false;
         let bit7 = acc >> 7;
         let s = acc as u16 + val as u16 + (self.processor.flags & FLAG_C) as u16;
+        
         if s > 255 {
             carry = true;
         }
-        let mut sum = acc.wrapping_add(val);
+        let mut sum = 0;
+    
+        sum = acc.wrapping_add(val);
         //Add carry bit
         sum = sum.wrapping_add(self.processor.flags & FLAG_C);
         self.processor.flags = Self::set_flags(self.processor.flags, sum);
@@ -1613,17 +1697,20 @@ self.add_info(format!("{:#x} - Running instruction sbc with acc: {:#x} memval: {
             self.processor.flags &= !FLAG_O;
         }
 
+
+        
+
         return sum;
     }
 
     fn nop(&mut self) {
-        let inst = self.data[(self.processor.pc) as usize];
-        if (inst != 0xea) {
+        if LOG_LEVEL > 0 {
+            self.add_info(format!("{:#x} - Running instruction nop: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize]));
+        }
+        if (self.processor.inst != 0xea) {
             self.speed = 1000;
         }
-        if LOG_LEVEL > 0 {
-self.add_info(format!("{:#x} - Running instruction nop: {:#x}", self.processor.pc, self.data[(self.processor.pc) as usize]));
-}
+        
         self.processor.pc += 1;
         self.processor.clock += 2;
         

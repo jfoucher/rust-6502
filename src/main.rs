@@ -8,6 +8,10 @@ use cursive::theme::Effect;
 use cursive::event::Key;
 use cursive::view::*;
 use cursive::views::*;
+use cursive::theme::BaseColor;
+use cursive::theme::Color;
+use cursive::theme::Style;
+use cursive::utils::markup::StyledString;
 use std::sync::mpsc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -58,6 +62,8 @@ impl Ui {
         let controller_tx_clone2 = ui.controller_tx.clone();
         let controller_tx_clone3 = ui.controller_tx.clone();
 
+
+
         ui.cursive.add_layer(
             Dialog::around(
                 utils::layout()
@@ -88,8 +94,9 @@ impl Ui {
                 .unwrap();
             })
             .button("Quit", |s| {
-                std::process::abort();
-                std::process::exit(0);
+                s.quit();
+                // std::process::abort();
+                // std::process::exit(0);
             })
             .title("6502 simulator")
             .full_screen()
@@ -152,11 +159,12 @@ impl Ui {
                     if t - self.t > 1000 {
                         let sp = processor.clock - self.clk;
                         self.clk = processor.clock;
-                        self.t = t;
+                        
                         let mut speed = self.cursive
                             .find_id::<TextView>("speed")
                             .unwrap();
-                        speed.set_content(format!("{:.2} MHz", sp as f64 / 1000000.0));
+                        speed.set_content(format!("{:.2} MHz", sp as f64 / 1000.0 / (t - self.t) as f64));
+                        self.t = t;
                     }
                     
 
@@ -201,21 +209,34 @@ impl Ui {
                     while let Some(line) = iter.next() {
                         let mut inner = line.iter();
                         let mut text = "".to_string();
-
-                        let atv = self.cursive.find_id::<TextView>(format!("addr-{}", cnt >> 4).as_str());
                         let addr = (btm << 4) + cnt;
+                        let mut text = StyledString::plain(format!("{:06x}  ", addr).as_str());
+                        // text.append(StyledString::styled("that ", Color::Dark(BaseColor::Red)));
+                        // styled.append(StyledString::styled(
+                        //     "cool?",
+                        //     Style::from(Color::Light(BaseColor::Blue)).combine(Effect::Bold),
+                        // ));
+                        let atv = self.cursive.find_id::<TextView>(format!("addr-{}", cnt >> 4).as_str());
+                        
                         while let Some(item) = inner.next() {
-                            
                             if cnt % 4 == 0 {
-                                text = format!("{}  {:02x}", text.as_str(), item);
+                                if ((btm << 4) + cnt == processor.pc) {
+                                    text.append(StyledString::styled(format!("  {:02x}", item).as_str(), Style::from(Color::Dark(BaseColor::Red)).combine(Effect::Bold)));
+                                } else {
+                                    text.append(StyledString::plain(format!("  {:02x}", item).as_str()));
+                                }
                             } else {
-                                text = format!("{} {:02x}", text.as_str(), item);
+                                if ((btm << 4) + cnt == processor.pc) {
+                                    text.append(StyledString::styled(format!(" {:02x}", item).as_str(), Style::from(Color::Dark(BaseColor::Red)).combine(Effect::Bold)));
+                                } else {
+                                    text.append(StyledString::plain(format!(" {:02x}", item).as_str()));
+                                }
                             }
                             cnt += 1;
                         }
 
                         if let Some(mut aview) = atv {
-                            aview.set_content(format!("{:#06x}  {}", addr, text));
+                            aview.set_content(text);
                         }
 
                     }
